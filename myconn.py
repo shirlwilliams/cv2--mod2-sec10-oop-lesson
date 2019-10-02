@@ -2,91 +2,75 @@ import sqlite3
 
 import pandas as pd
 
-# ORM
 
-class MyConn():
+class MyConn(object):
 
+    # what is the init method for?
+    # it specifies things to do upon instantiation (creation)
 
     def __init__(self, filename=None):
-        self.conn = sqlite3.connect(filename)
-        self.cursor = self.conn.cursor()
-        pass
+        # what is self? 
+        # a reference to the object
+        self.__connection(filename=filename)
 
+    def __connection(self, filename):
+        self._conn = sqlite3.connect(filename)
+        self.cursor = self._conn.cursor()
+        print(f"cursor has been created for {filename}")
 
     def list_tables(self):
-        query = "SELECT name FROM sqlite_master WHERE type='table';"
-        results = self.cursor.execute(query).fetchall()
-        for r in results:
-            print(r[0])
-        pass
+        query = """
+                SELECT name
+                FROM sqlite_master 
+                WHERE type ='table';
+                """
 
+        res = self.cursor.execute(query).fetchall()
+        table_names = [r[0] for r in res]
+        return table_names
 
-    def build_select_all_query(self, table_name=None):
-        try:
-            query = "select * from {}".format(self.table_name)
-        except Exception as e:
-            print("---no tablename in object, exception:---\n{}".format(e))
-            query = "select * from {}".format(table_name)
-        return query
+    @staticmethod
+    def build_select_all_query(table_name=None):
+        return f"select * from {table_name}"
 
-    
-    def get_table_description(self, table_name=None):
-        try:
-            query = 'select * from {}'.format(self.table_name)
-        except:
-            query = 'select * from {}'.format(table_name)
-        self.cursor.execute(query)
-        return self.cursor.description
-    
-
-    def load_table_as_df(self, table_name):
-        """
-        Loads a table of your sqlite db into a pandas df
-        Input
-        table_name: str, name of your table
-        
-        Return
-        df: pandas dataframe
-        """
+    def select_all_from_table(self, table_name=None, load_df=False):
         query = self.build_select_all_query(table_name=table_name)
-        df = pd.read_sql(query, self.conn)
-        return df
+        if not load_df:
+            res = self.cursor.execute(query).fetchall()
+            return res
 
-    
-    def load_query_as_df(self, query):
-        df = pd.read_sql(query, self.conn)
-        return df
+        else:
+            df = pd.read_sql(query, self._conn)
+            return df
 
+    def list_table_columns(self, table_name):
+        query = f"PRAGMA table_info({table_name});"
 
-class Customers(MyConn):
+        return self.cursor.execute(query).fetchall()
 
-    def __init__(self, filename=None):
-        super().__init__(filename=filename)
-        self.table_name = 'customers'
-
-    
-    def select_customers_by_state(self, state=None):
-        query = "select * from customers where state='{}'".format(state)
-        df = self.load_query_as_df(query)
-        return df
+    def close_connection(self):
+        print("-" * 50)
+        print("----closing connection to db----")
+        print("-" * 50)
+        self._conn.close()
 
 
-    def select_customers_by_country(self, country=None):
-        query = "select * from customers where country='{}'".format(country)
-        df = self.load_query_as_df(query)
-        return df
-
+# child class for one of our tables
+# Employees
 
 class Employees(MyConn):
 
-
     def __init__(self, filename=None):
-        super().__init__(filename=filename)
+        super(Employees, self).__init__(filename=filename)
         self.table_name = 'employees'
 
+    def select_employee_names_by_office_code(self, office_code=None):
+        query = f"select lastname, firstname, officecode from {self.table_name} where officecode is '{office_code}'"
 
-    def get_employees_by_title(self, jobtitle=None):
-        query = "select * from employees where jobtitle='{}'".format(jobtitle)
-        df = self.load_query_as_df(query)
-        return df
-    
+        return self.cursor.execute(query).fetchall()
+
+
+if __name__ == "__main__":
+    my_conn = Employees(filename='data.sqlite')
+
+    my_conn.select_employee_names_by_office_code(office_code=1)
